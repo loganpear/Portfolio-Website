@@ -4,13 +4,14 @@ import { Navigation } from './components/Navigation';
 import { BentoGrid, BentoItem } from './components/BentoGrid';
 import { NavigationTab } from './types';
 import { MOCK_PROJECTS } from './constants';
-import { getResumeSummary } from './services/geminiService';
-import { Github, Linkedin, Twitter, ExternalLink, ArrowRight, BrainCircuit, Code, ChartBar, Loader2, FileText, AlertCircle } from 'lucide-react';
+import { getResumeSummary, getResumeMetadata } from './services/geminiService';
+import { Github, Linkedin, Twitter, ExternalLink, ArrowRight, BrainCircuit, Code, ChartBar, Loader2, FileText, AlertCircle, Sparkles } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavigationTab>(NavigationTab.HOME);
   const [isLoading, setIsLoading] = useState(true);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiMetadata, setAiMetadata] = useState<{focus1: string, focus2: string, title: string} | null>(null);
   const [liveResume, setLiveResume] = useState<string>("");
   const [liveEssays, setLiveEssays] = useState<any[]>([]);
   const [errorStatus, setErrorStatus] = useState<{resume?: string, strategy?: string}>({});
@@ -19,7 +20,7 @@ const App: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch Resume
+        // Fetch Resume from API
         const resumeRes = await fetch('/api/resume');
         if (!resumeRes.ok) {
           const err = await resumeRes.json();
@@ -29,8 +30,15 @@ const App: React.FC = () => {
         
         if (resumeData.body) {
           setLiveResume(resumeData.body);
-          const summary = await getResumeSummary(resumeData.body);
+          
+          // Parallelize AI requests for efficiency
+          const [summary, metadata] = await Promise.all([
+            getResumeSummary(resumeData.body),
+            getResumeMetadata(resumeData.body)
+          ]);
+          
           setAiSummary(summary);
+          setAiMetadata(metadata);
         }
       } catch (err: any) {
         console.error("Resume fetch failed:", err);
@@ -65,7 +73,7 @@ const App: React.FC = () => {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#0a0a0a] text-white">
         <Loader2 className="animate-spin mb-4 text-blue-500" size={48} />
-        <p className="text-gray-500 font-medium animate-pulse uppercase tracking-[0.2em] text-xs">Connecting to Google Cloud...</p>
+        <p className="text-gray-500 font-medium animate-pulse uppercase tracking-[0.2em] text-xs">Authenticating with Google Drive...</p>
       </div>
     );
   }
@@ -75,14 +83,18 @@ const App: React.FC = () => {
       case NavigationTab.HOME:
         return (
           <BentoGrid className="max-w-6xl mx-auto px-4 py-12 pb-32">
+            {/* Main Bio Tile */}
             <BentoItem colSpan={2} rowSpan={2} className="flex flex-col justify-between bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a]">
               <div>
-                <span className="text-blue-500 font-bold text-xs uppercase tracking-widest mb-4 block">About Me</span>
+                <span className="text-blue-500 font-bold text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Sparkles size={14} /> Personal Statement
+                </span>
                 <h2 className="text-4xl font-bold tracking-tighter mb-6 leading-tight text-white">
-                  Engineering <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Solutions</span> through Data.
+                  {aiMetadata?.title || "Engineering Solutions"} <br/>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Grounded in Data.</span>
                 </h2>
-                <p className="text-gray-400 leading-relaxed text-lg">
-                  {aiSummary || "Software Engineer and Data Science student focused on technical infrastructure and strategic market insights."}
+                <p className="text-gray-400 leading-relaxed text-lg italic">
+                  "{aiSummary || "Software Engineer focused on building robust technical infrastructure and deep strategic market analysis."}"
                 </p>
               </div>
               <div className="flex gap-4 mt-8">
@@ -92,6 +104,7 @@ const App: React.FC = () => {
               </div>
             </BentoItem>
 
+            {/* Live Resume View Tile */}
             <BentoItem colSpan={2} rowSpan={2} className="bg-[#111] flex flex-col">
               <div className="flex justify-between items-center mb-6 sticky top-0 bg-[#111] py-2 z-10 border-b border-white/5">
                 <h3 className="text-xl font-bold flex items-center gap-2">
@@ -106,7 +119,7 @@ const App: React.FC = () => {
                   ) : (
                     <>
                       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      <span className="text-gray-500 text-[10px] font-bold uppercase">Synced</span>
+                      <span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">Active Sync</span>
                     </>
                   )}
                 </div>
@@ -118,37 +131,44 @@ const App: React.FC = () => {
                     <AlertCircle className="text-red-500 mb-2" size={32} />
                     <p className="text-sm font-bold text-red-400 uppercase tracking-widest mb-1">Authorization Error</p>
                     <p className="text-xs text-gray-500 leading-relaxed">
-                      Make sure your Google Doc is shared with your Service Account email as a "Viewer".
+                      Check Vercel logs and ensure your Google Doc is shared with the Service Account.
                     </p>
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap font-mono">
-                    {liveResume || "The document appears to be empty."}
+                  <div className="text-xs text-gray-500 leading-relaxed whitespace-pre-wrap font-mono opacity-80">
+                    {liveResume || "The document appears to be empty or restricted."}
                   </div>
                 )}
               </div>
             </BentoItem>
 
+            {/* Dynamic Skill Tile 1 */}
             <BentoItem colSpan={1} className="flex flex-col justify-center items-center gap-4 bg-[#141414]">
               <div className="w-12 h-12 bg-purple-500/10 rounded-2xl flex items-center justify-center">
                 <Code className="text-purple-500" size={24} />
               </div>
               <div className="text-center">
-                <div className="font-bold text-lg">Rust & TS</div>
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Core Stack</div>
+                <div className="font-bold text-lg truncate w-full px-2">
+                  {aiMetadata?.focus1 || "Technical"}
+                </div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Primary Focus</div>
               </div>
             </BentoItem>
 
+            {/* Dynamic Skill Tile 2 */}
             <BentoItem colSpan={1} className="flex flex-col justify-center items-center gap-4 bg-[#141414]">
               <div className="w-12 h-12 bg-green-500/10 rounded-2xl flex items-center justify-center">
                 <ChartBar className="text-green-500" size={24} />
               </div>
               <div className="text-center">
-                <div className="font-bold text-lg">Data Sci</div>
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">SOTA Focus</div>
+                <div className="font-bold text-lg truncate w-full px-2">
+                  {aiMetadata?.focus2 || "Strategic"}
+                </div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Core Expertise</div>
               </div>
             </BentoItem>
 
+            {/* Strategy Drive Link Tile */}
             <BentoItem colSpan={2} className="flex items-center justify-between group cursor-pointer bg-blue-600/5 hover:bg-blue-600/10 border-blue-600/20" onClick={() => handleTabChange(NavigationTab.STRATEGY)}>
               <div className="flex items-center gap-6 px-4">
                 <div className="text-3xl font-black italic text-blue-500/20 group-hover:text-blue-500/40 transition-colors">
@@ -156,7 +176,7 @@ const App: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold group-hover:text-blue-400 transition-colors">Strategy Essays</h3>
-                  <p className="text-gray-500 text-sm">{errorStatus.strategy ? "Configuration Required" : "Automated insights from Drive."}</p>
+                  <p className="text-gray-500 text-sm">{errorStatus.strategy ? "Check Folder Access" : "Case studies from Google Drive."}</p>
                 </div>
               </div>
               <div className="mr-4 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:translate-x-2 transition-transform">
@@ -219,8 +239,8 @@ const App: React.FC = () => {
                </div>
                <p className="text-gray-500 mt-4 max-w-xl">
                  {errorStatus.strategy 
-                   ? "We couldn't reach your Strategy folder. Ensure STRATEGY_FOLDER_ID is correct and shared with your Service Account."
-                   : "Real-time research papers and product teardowns automatically synced from my personal Google Drive."}
+                   ? "Drive synchronization failed. Ensure the folder is shared with your service account."
+                   : "Real-time research papers and product teardowns automatically synced from Google Drive."}
                </p>
              </header>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -252,7 +272,9 @@ const App: React.FC = () => {
     <div className="min-h-screen selection:bg-blue-500 selection:text-white">
       <header className="max-w-6xl mx-auto px-4 py-10 flex justify-between items-center relative z-10">
         <div className="font-black text-2xl tracking-tighter flex items-center gap-3 cursor-pointer" onClick={() => handleTabChange(NavigationTab.HOME)}>
-           <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-xl flex items-center justify-center text-white font-black italic shadow-lg shadow-blue-600/20">JD</div>
+           <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-xl flex items-center justify-center text-white font-black italic shadow-lg shadow-blue-600/20 uppercase">
+             {aiMetadata?.title?.[0] || "LP"}
+           </div>
            <span className="hidden sm:block">LOGAN PEAR</span>
         </div>
         <div className="flex gap-8 text-xs font-black tracking-[0.2em] text-gray-500 uppercase">
