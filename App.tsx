@@ -22,11 +22,11 @@ const App: React.FC = () => {
       try {
         // Fetch Resume from API
         const resumeRes = await fetch('/api/resume');
-        if (!resumeRes.ok) {
-          const err = await resumeRes.json();
-          throw new Error(err.error || 'Failed to fetch resume');
-        }
         const resumeData = await resumeRes.json();
+
+        if (!resumeRes.ok) {
+          throw new Error(resumeData.error || 'Failed to fetch resume');
+        }
         
         if (resumeData.body) {
           setLiveResume(resumeData.body);
@@ -48,11 +48,11 @@ const App: React.FC = () => {
       try {
         // Fetch Strategy Essays
         const strategyRes = await fetch('/api/strategy');
-        if (!strategyRes.ok) {
-          const err = await strategyRes.json();
-          throw new Error(err.error || 'Failed to fetch strategy folder');
-        }
         const strategyData = await strategyRes.json();
+        
+        if (!strategyRes.ok) {
+          throw new Error(strategyData.error || 'Failed to fetch strategy folder');
+        }
         setLiveEssays(strategyData || []);
       } catch (err: any) {
         console.error("Strategy fetch failed:", err);
@@ -73,7 +73,7 @@ const App: React.FC = () => {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#0a0a0a] text-white">
         <Loader2 className="animate-spin mb-4 text-blue-500" size={48} />
-        <p className="text-gray-500 font-medium animate-pulse uppercase tracking-[0.2em] text-xs">Authenticating with Google Drive...</p>
+        <p className="text-gray-500 font-medium animate-pulse uppercase tracking-[0.2em] text-xs">Connecting to Google Cloud...</p>
       </div>
     );
   }
@@ -90,12 +90,23 @@ const App: React.FC = () => {
                   <Sparkles size={14} /> Personal Statement
                 </span>
                 <h2 className="text-4xl font-bold tracking-tighter mb-6 leading-tight text-white">
-                  {aiMetadata?.title || "Engineering Solutions"} <br/>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Grounded in Data.</span>
+                  {aiMetadata?.title || "Professional Overview"} <br/>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Synced via Drive.</span>
                 </h2>
-                <p className="text-gray-400 leading-relaxed text-lg italic">
-                  "{aiSummary || "Software Engineer focused on building robust technical infrastructure and deep strategic market analysis."}"
-                </p>
+                <div className="min-h-[100px]">
+                  {aiSummary ? (
+                    <p className="text-gray-400 leading-relaxed text-lg italic transition-opacity duration-500">
+                      "{aiSummary}"
+                    </p>
+                  ) : errorStatus.resume ? (
+                    <p className="text-red-400/50 text-sm">Summary unavailable due to sync error.</p>
+                  ) : (
+                    <div className="flex items-center gap-2 text-gray-600 animate-pulse">
+                      <Loader2 size={16} className="animate-spin" />
+                      <span className="text-sm">Generating grounded summary...</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex gap-4 mt-8">
                 <a href="#" className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-all border border-white/5"><Github size={20} /></a>
@@ -114,7 +125,7 @@ const App: React.FC = () => {
                   {errorStatus.resume ? (
                     <>
                       <AlertCircle className="text-red-500" size={14} />
-                      <span className="text-red-500/70 text-[10px] font-bold uppercase tracking-tight">Sync Failed</span>
+                      <span className="text-red-500/70 text-[10px] font-bold uppercase tracking-tight">Sync Error</span>
                     </>
                   ) : (
                     <>
@@ -129,14 +140,18 @@ const App: React.FC = () => {
                 {errorStatus.resume ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-red-500/5 rounded-2xl border border-red-500/10">
                     <AlertCircle className="text-red-500 mb-2" size={32} />
-                    <p className="text-sm font-bold text-red-400 uppercase tracking-widest mb-1">Authorization Error</p>
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                      Check Vercel logs and ensure your Google Doc is shared with the Service Account.
+                    <p className="text-sm font-bold text-red-400 uppercase tracking-widest mb-1">API Error</p>
+                    <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                      {errorStatus.resume}
                     </p>
+                    <div className="text-[10px] text-gray-600 bg-white/5 p-2 rounded border border-white/5 font-mono text-left w-full break-all">
+                      Check: {process.env.RESUME_DOC_ID ? "ID Set" : "ID Missing"}<br/>
+                      Shared with: vercel-integration@portfolioweb-484216.iam.gserviceaccount.com
+                    </div>
                   </div>
                 ) : (
                   <div className="text-xs text-gray-500 leading-relaxed whitespace-pre-wrap font-mono opacity-80">
-                    {liveResume || "The document appears to be empty or restricted."}
+                    {liveResume || "Parsing Google Doc structure..."}
                   </div>
                 )}
               </div>
@@ -149,9 +164,9 @@ const App: React.FC = () => {
               </div>
               <div className="text-center">
                 <div className="font-bold text-lg truncate w-full px-2">
-                  {aiMetadata?.focus1 || "Technical"}
+                  {aiMetadata?.focus1 || "..."}
                 </div>
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Primary Focus</div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Core Tech</div>
               </div>
             </BentoItem>
 
@@ -162,9 +177,9 @@ const App: React.FC = () => {
               </div>
               <div className="text-center">
                 <div className="font-bold text-lg truncate w-full px-2">
-                  {aiMetadata?.focus2 || "Strategic"}
+                  {aiMetadata?.focus2 || "..."}
                 </div>
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Core Expertise</div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Specialization</div>
               </div>
             </BentoItem>
 
@@ -176,7 +191,7 @@ const App: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold group-hover:text-blue-400 transition-colors">Strategy Essays</h3>
-                  <p className="text-gray-500 text-sm">{errorStatus.strategy ? "Check Folder Access" : "Case studies from Google Drive."}</p>
+                  <p className="text-gray-500 text-sm">{errorStatus.strategy ? "Folder sync error" : "Live case studies."}</p>
                 </div>
               </div>
               <div className="mr-4 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:translate-x-2 transition-transform">
@@ -234,12 +249,12 @@ const App: React.FC = () => {
                  </div>
                  <div className="text-[10px] font-bold text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/5 flex items-center gap-2">
                    {errorStatus.strategy ? <AlertCircle size={12} className="text-red-500" /> : <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />}
-                   DRIVE SYNC: {errorStatus.strategy ? "OFFLINE" : "ACTIVE"}
+                   DRIVE SYNC: {errorStatus.strategy ? "ERROR" : "ACTIVE"}
                  </div>
                </div>
                <p className="text-gray-500 mt-4 max-w-xl">
                  {errorStatus.strategy 
-                   ? "Drive synchronization failed. Ensure the folder is shared with your service account."
+                   ? `Sync Failed: ${errorStatus.strategy}`
                    : "Real-time research papers and product teardowns automatically synced from Google Drive."}
                </p>
              </header>
@@ -255,7 +270,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                     <h3 className="text-3xl font-bold mb-4 group-hover:text-purple-400 transition-colors tracking-tight">{essay.name}</h3>
-                    <p className="text-gray-400 leading-relaxed text-lg line-clamp-2">{essay.description || "Deep dive analysis and strategic market mapping."}</p>
+                    <p className="text-gray-400 leading-relaxed text-lg line-clamp-2">{essay.description || "Analysis synced from Drive."}</p>
                   </BentoItem>
                 )) : (
                   <div className="col-span-2 py-20 text-center border-2 border-dashed border-[#222] rounded-3xl">
@@ -275,7 +290,7 @@ const App: React.FC = () => {
            <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-xl flex items-center justify-center text-white font-black italic shadow-lg shadow-blue-600/20 uppercase">
              {aiMetadata?.title?.[0] || "LP"}
            </div>
-           <span className="hidden sm:block">LOGAN PEAR</span>
+           <span className="hidden sm:block uppercase tracking-tighter">Logan Pear</span>
         </div>
         <div className="flex gap-8 text-xs font-black tracking-[0.2em] text-gray-500 uppercase">
           <button className="hover:text-white transition-colors" onClick={() => handleTabChange(NavigationTab.HOME)}>About</button>

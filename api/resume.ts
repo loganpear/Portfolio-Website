@@ -7,7 +7,7 @@ export const config = {
 
 export default async function handler(req: any, res: any) {
   try {
-    const docId = process.env.RESUME_DOC_ID;
+    const docId = process.env.RESUME_DOC_ID?.trim();
     if (!docId) {
       return res.status(500).json({ error: 'RESUME_DOC_ID environment variable is not set' });
     }

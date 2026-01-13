@@ -7,7 +7,7 @@ export const config = {
 
 export default async function handler(req: any, res: any) {
   try {
-    const folderId = process.env.STRATEGY_FOLDER_ID;
+    const folderId = process.env.STRATEGY_FOLDER_ID?.trim();
     if (!folderId) {
       return res.status(500).json({ error: 'STRATEGY_FOLDER_ID environment variable is not set' });
     }
