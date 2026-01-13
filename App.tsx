@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { Navigation } from './components/Navigation';
 import { BentoGrid, BentoItem } from './components/BentoGrid';
-import { NavigationTab, Experience, Essay } from './types';
+import { NavigationTab } from './types';
 import { MOCK_PROJECTS } from './constants';
 import { getResumeSummary } from './services/geminiService';
-import { Github, Linkedin, Twitter, ExternalLink, ArrowRight, BrainCircuit, Code, ChartBar, Loader2, FileText } from 'lucide-react';
+import { Github, Linkedin, Twitter, ExternalLink, ArrowRight, BrainCircuit, Code, ChartBar, Loader2, FileText, AlertCircle } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavigationTab>(NavigationTab.HOME);
@@ -13,29 +13,42 @@ const App: React.FC = () => {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [liveResume, setLiveResume] = useState<string>("");
   const [liveEssays, setLiveEssays] = useState<any[]>([]);
+  const [errorStatus, setErrorStatus] = useState<{resume?: string, strategy?: string}>({});
 
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch Resume from Serverless API
+        // Fetch Resume
         const resumeRes = await fetch('/api/resume');
+        if (!resumeRes.ok) {
+          const err = await resumeRes.json();
+          throw new Error(err.error || 'Failed to fetch resume');
+        }
         const resumeData = await resumeRes.json();
         
         if (resumeData.body) {
           setLiveResume(resumeData.body);
-          // Get AI Summary of the live resume
           const summary = await getResumeSummary(resumeData.body);
           setAiSummary(summary);
         }
+      } catch (err: any) {
+        console.error("Resume fetch failed:", err);
+        setErrorStatus(prev => ({ ...prev, resume: err.message }));
+      }
 
-        // Fetch Strategy Essays from Serverless API
+      try {
+        // Fetch Strategy Essays
         const strategyRes = await fetch('/api/strategy');
+        if (!strategyRes.ok) {
+          const err = await strategyRes.json();
+          throw new Error(err.error || 'Failed to fetch strategy folder');
+        }
         const strategyData = await strategyRes.json();
         setLiveEssays(strategyData || []);
-
-      } catch (err) {
-        console.error("Data fetch failed. Ensure GOOGLE_ credentials and IDs are set in Vercel.", err);
+      } catch (err: any) {
+        console.error("Strategy fetch failed:", err);
+        setErrorStatus(prev => ({ ...prev, strategy: err.message }));
       } finally {
         setIsLoading(false);
       }
@@ -52,7 +65,7 @@ const App: React.FC = () => {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#0a0a0a] text-white">
         <Loader2 className="animate-spin mb-4 text-blue-500" size={48} />
-        <p className="text-gray-500 font-medium animate-pulse uppercase tracking-[0.2em] text-xs">Accessing Google Cloud...</p>
+        <p className="text-gray-500 font-medium animate-pulse uppercase tracking-[0.2em] text-xs">Connecting to Google Cloud...</p>
       </div>
     );
   }
@@ -79,18 +92,40 @@ const App: React.FC = () => {
               </div>
             </BentoItem>
 
-            <BentoItem colSpan={2} rowSpan={2} className="bg-[#111] overflow-y-auto">
-              <div className="flex justify-between items-center mb-8 sticky top-0 bg-[#111] py-2 z-10">
+            <BentoItem colSpan={2} rowSpan={2} className="bg-[#111] flex flex-col">
+              <div className="flex justify-between items-center mb-6 sticky top-0 bg-[#111] py-2 z-10 border-b border-white/5">
                 <h3 className="text-xl font-bold flex items-center gap-2">
                   <FileText className="text-blue-500" size={20} /> Live Resume
                 </h3>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-gray-500 text-[10px] font-bold uppercase">Synced</span>
+                  {errorStatus.resume ? (
+                    <>
+                      <AlertCircle className="text-red-500" size={14} />
+                      <span className="text-red-500/70 text-[10px] font-bold uppercase tracking-tight">Sync Failed</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-gray-500 text-[10px] font-bold uppercase">Synced</span>
+                    </>
+                  )}
                 </div>
               </div>
-              <div className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap font-mono">
-                {liveResume || "Resume content could not be loaded. Check your Google Doc ID."}
+              
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                {errorStatus.resume ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-red-500/5 rounded-2xl border border-red-500/10">
+                    <AlertCircle className="text-red-500 mb-2" size={32} />
+                    <p className="text-sm font-bold text-red-400 uppercase tracking-widest mb-1">Authorization Error</p>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      Make sure your Google Doc is shared with your Service Account email as a "Viewer".
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap font-mono">
+                    {liveResume || "The document appears to be empty."}
+                  </div>
+                )}
               </div>
             </BentoItem>
 
@@ -110,16 +145,18 @@ const App: React.FC = () => {
               </div>
               <div className="text-center">
                 <div className="font-bold text-lg">Data Sci</div>
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Student @ Uni</div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">SOTA Focus</div>
               </div>
             </BentoItem>
 
             <BentoItem colSpan={2} className="flex items-center justify-between group cursor-pointer bg-blue-600/5 hover:bg-blue-600/10 border-blue-600/20" onClick={() => handleTabChange(NavigationTab.STRATEGY)}>
               <div className="flex items-center gap-6 px-4">
-                <div className="text-3xl font-black italic text-blue-500/20 group-hover:text-blue-500/40 transition-colors">{liveEssays.length || 0}</div>
+                <div className="text-3xl font-black italic text-blue-500/20 group-hover:text-blue-500/40 transition-colors">
+                  {errorStatus.strategy ? "!" : (liveEssays.length || "0")}
+                </div>
                 <div>
                   <h3 className="text-xl font-bold group-hover:text-blue-400 transition-colors">Strategy Essays</h3>
-                  <p className="text-gray-500 text-sm">Case studies from Google Drive.</p>
+                  <p className="text-gray-500 text-sm">{errorStatus.strategy ? "Configuration Required" : "Automated insights from Drive."}</p>
                 </div>
               </div>
               <div className="mr-4 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:translate-x-2 transition-transform">
@@ -146,7 +183,7 @@ const App: React.FC = () => {
                       <div className="flex justify-between items-start mb-6">
                         <h3 className="text-3xl font-bold tracking-tight">{project.title}</h3>
                         {project.link && (
-                          <a href={project.link} target="_blank" className="p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-all">
+                          <a href={project.link} target="_blank" rel="noopener noreferrer" className="p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-all">
                             <ExternalLink size={20} className="text-blue-500" />
                           </a>
                         )}
@@ -173,27 +210,32 @@ const App: React.FC = () => {
                <div className="flex justify-between items-end">
                  <div>
                    <span className="text-purple-500 font-bold text-xs uppercase tracking-[0.3em] mb-2 block">Insights</span>
-                   <h1 className="text-5xl font-black tracking-tighter">The Drive Folder</h1>
+                   <h1 className="text-5xl font-black tracking-tighter">The Strategy Deck</h1>
                  </div>
-                 <div className="text-[10px] font-bold text-gray-600 bg-white/5 px-4 py-2 rounded-full border border-white/5">
-                   FOLDER_ID: {process.env.STRATEGY_FOLDER_ID?.substring(0, 6)}...
+                 <div className="text-[10px] font-bold text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/5 flex items-center gap-2">
+                   {errorStatus.strategy ? <AlertCircle size={12} className="text-red-500" /> : <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />}
+                   DRIVE SYNC: {errorStatus.strategy ? "OFFLINE" : "ACTIVE"}
                  </div>
                </div>
-               <p className="text-gray-500 mt-4 max-w-xl">These documents are pulled in real-time. Simply drop a Google Doc into your designated folder and it will appear here.</p>
+               <p className="text-gray-500 mt-4 max-w-xl">
+                 {errorStatus.strategy 
+                   ? "We couldn't reach your Strategy folder. Ensure STRATEGY_FOLDER_ID is correct and shared with your Service Account."
+                   : "Real-time research papers and product teardowns automatically synced from my personal Google Drive."}
+               </p>
              </header>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {liveEssays.length > 0 ? liveEssays.map((essay) => (
                   <BentoItem key={essay.id} colSpan={2} className="cursor-pointer group hover:border-purple-500/30">
                     <div className="flex justify-between items-center mb-4">
                       <span className="text-[10px] font-black tracking-[0.2em] text-purple-500 uppercase px-2 py-1 bg-purple-500/10 rounded-md">
-                        {new Date(essay.createdTime).toLocaleDateString()}
+                        {new Date(essay.createdTime).toLocaleDateString(undefined, { year: 'numeric', month: 'short' })}
                       </span>
                       <div className="w-8 h-8 rounded-full border border-white/5 flex items-center justify-center text-gray-700 group-hover:text-purple-500 group-hover:border-purple-500/30 transition-all">
                         <ArrowRight size={16} />
                       </div>
                     </div>
                     <h3 className="text-3xl font-bold mb-4 group-hover:text-purple-400 transition-colors tracking-tight">{essay.name}</h3>
-                    <p className="text-gray-400 leading-relaxed text-lg line-clamp-2">{essay.description || "Read the full analysis and teardown of this market segment."}</p>
+                    <p className="text-gray-400 leading-relaxed text-lg line-clamp-2">{essay.description || "Deep dive analysis and strategic market mapping."}</p>
                   </BentoItem>
                 )) : (
                   <div className="col-span-2 py-20 text-center border-2 border-dashed border-[#222] rounded-3xl">
