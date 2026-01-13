@@ -1,5 +1,5 @@
 
-import { listFolderFiles } from '../lib/google-docs';
+import { listFolderFiles } from '../lib/google-docs.js';
 
 export const config = {
   runtime: 'nodejs',

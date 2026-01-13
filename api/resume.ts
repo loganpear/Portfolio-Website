@@ -1,5 +1,5 @@
 
-import { getGoogleDoc } from '../lib/google-docs';
+import { getGoogleDoc } from '../lib/google-docs.js';
 
 export const config = {
   runtime: 'nodejs',

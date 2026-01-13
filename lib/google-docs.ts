@@ -3,17 +3,18 @@ import { google } from 'googleapis';
 
 /**
  * Server-side utility to fetch Google Docs content.
- * Handles both individual environment variables and the full JSON string.
  */
 function getAuth(scopes: string[]) {
   let credentials: any;
 
-  // 1. Try to parse the full JSON if provided
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  // 1. Check for the full JSON blob first
+  const jsonCreds = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (jsonCreds) {
     try {
-      credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+      // Vercel sometimes escapes quotes in env vars, try to handle that
+      credentials = JSON.parse(jsonCreds.trim());
     } catch (e) {
-      console.error('Failed to parse GOOGLE_APPLICATION_CREDENTIALS as JSON');
+      console.error('Failed to parse GOOGLE_APPLICATION_CREDENTIALS as JSON. Ensure it is a valid JSON string.');
     }
   }
 
@@ -25,14 +26,13 @@ function getAuth(scopes: string[]) {
     };
   }
 
-  // 3. Ensure the private key is formatted correctly for Google's SDK
-  // It handles the case where newlines are escaped as "\\n" string literals
-  if (credentials.private_key) {
+  // 3. Format the private key
+  if (credentials && credentials.private_key) {
     credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
   }
 
-  if (!credentials.client_email || !credentials.private_key) {
-    throw new Error('Missing Google Service Account credentials. Check your environment variables.');
+  if (!credentials || !credentials.client_email || !credentials.private_key) {
+    throw new Error('Missing Google Service Account credentials. Please set GOOGLE_APPLICATION_CREDENTIALS (the full JSON) or GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY.');
   }
 
   return new google.auth.GoogleAuth({
@@ -63,7 +63,7 @@ export async function getGoogleDoc(docId: string) {
     };
   } catch (error: any) {
     console.error(`Error fetching Google Doc (${docId}):`, error.message);
-    throw error;
+    throw new Error(`Google API Error: ${error.message}`);
   }
 }
 
@@ -80,6 +80,6 @@ export async function listFolderFiles(folderId: string) {
     return res.data.files || [];
   } catch (error: any) {
     console.error(`Error listing Drive folder (${folderId}):`, error.message);
-    throw error;
+    throw new Error(`Drive API Error: ${error.message}`);
   }
 }

@@ -19,24 +19,29 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      try {
-        // Fetch Resume from API
-        const resumeRes = await fetch('/api/resume');
-        const resumeData = await resumeRes.json();
-
-        if (!resumeRes.ok) {
-          throw new Error(resumeData.error || 'Failed to fetch resume');
+      
+      // Helper to handle fetch with text-fallback for errors
+      const safeFetch = async (url: string) => {
+        const res = await fetch(url);
+        const contentType = res.headers.get("content-type");
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || `Server responded with ${res.status}`);
         }
-        
+        if (contentType && contentType.includes("application/json")) {
+          return await res.json();
+        }
+        throw new Error("Server did not return JSON");
+      };
+
+      try {
+        const resumeData = await safeFetch('/api/resume');
         if (resumeData.body) {
           setLiveResume(resumeData.body);
-          
-          // Parallelize AI requests for efficiency
           const [summary, metadata] = await Promise.all([
             getResumeSummary(resumeData.body),
             getResumeMetadata(resumeData.body)
           ]);
-          
           setAiSummary(summary);
           setAiMetadata(metadata);
         }
@@ -46,13 +51,7 @@ const App: React.FC = () => {
       }
 
       try {
-        // Fetch Strategy Essays
-        const strategyRes = await fetch('/api/strategy');
-        const strategyData = await strategyRes.json();
-        
-        if (!strategyRes.ok) {
-          throw new Error(strategyData.error || 'Failed to fetch strategy folder');
-        }
+        const strategyData = await safeFetch('/api/strategy');
         setLiveEssays(strategyData || []);
       } catch (err: any) {
         console.error("Strategy fetch failed:", err);
@@ -83,7 +82,6 @@ const App: React.FC = () => {
       case NavigationTab.HOME:
         return (
           <BentoGrid className="max-w-6xl mx-auto px-4 py-12 pb-32">
-            {/* Main Bio Tile */}
             <BentoItem colSpan={2} rowSpan={2} className="flex flex-col justify-between bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a]">
               <div>
                 <span className="text-blue-500 font-bold text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -99,7 +97,7 @@ const App: React.FC = () => {
                       "{aiSummary}"
                     </p>
                   ) : errorStatus.resume ? (
-                    <p className="text-red-400/50 text-sm">Summary unavailable due to sync error.</p>
+                    <p className="text-red-400/50 text-xs italic">Summary unavailable: Sync error detected.</p>
                   ) : (
                     <div className="flex items-center gap-2 text-gray-600 animate-pulse">
                       <Loader2 size={16} className="animate-spin" />
@@ -115,7 +113,6 @@ const App: React.FC = () => {
               </div>
             </BentoItem>
 
-            {/* Live Resume View Tile */}
             <BentoItem colSpan={2} rowSpan={2} className="bg-[#111] flex flex-col">
               <div className="flex justify-between items-center mb-6 sticky top-0 bg-[#111] py-2 z-10 border-b border-white/5">
                 <h3 className="text-xl font-bold flex items-center gap-2">
@@ -141,11 +138,10 @@ const App: React.FC = () => {
                   <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-red-500/5 rounded-2xl border border-red-500/10">
                     <AlertCircle className="text-red-500 mb-2" size={32} />
                     <p className="text-sm font-bold text-red-400 uppercase tracking-widest mb-1">API Error</p>
-                    <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                    <p className="text-[10px] text-gray-500 leading-relaxed mb-4 max-h-[100px] overflow-hidden">
                       {errorStatus.resume}
                     </p>
                     <div className="text-[10px] text-gray-600 bg-white/5 p-2 rounded border border-white/5 font-mono text-left w-full break-all">
-                      Check: {process.env.RESUME_DOC_ID ? "ID Set" : "ID Missing"}<br/>
                       Shared with: vercel-integration@portfolioweb-484216.iam.gserviceaccount.com
                     </div>
                   </div>
@@ -157,7 +153,6 @@ const App: React.FC = () => {
               </div>
             </BentoItem>
 
-            {/* Dynamic Skill Tile 1 */}
             <BentoItem colSpan={1} className="flex flex-col justify-center items-center gap-4 bg-[#141414]">
               <div className="w-12 h-12 bg-purple-500/10 rounded-2xl flex items-center justify-center">
                 <Code className="text-purple-500" size={24} />
@@ -170,7 +165,6 @@ const App: React.FC = () => {
               </div>
             </BentoItem>
 
-            {/* Dynamic Skill Tile 2 */}
             <BentoItem colSpan={1} className="flex flex-col justify-center items-center gap-4 bg-[#141414]">
               <div className="w-12 h-12 bg-green-500/10 rounded-2xl flex items-center justify-center">
                 <ChartBar className="text-green-500" size={24} />
@@ -183,7 +177,6 @@ const App: React.FC = () => {
               </div>
             </BentoItem>
 
-            {/* Strategy Drive Link Tile */}
             <BentoItem colSpan={2} className="flex items-center justify-between group cursor-pointer bg-blue-600/5 hover:bg-blue-600/10 border-blue-600/20" onClick={() => handleTabChange(NavigationTab.STRATEGY)}>
               <div className="flex items-center gap-6 px-4">
                 <div className="text-3xl font-black italic text-blue-500/20 group-hover:text-blue-500/40 transition-colors">
@@ -191,7 +184,7 @@ const App: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold group-hover:text-blue-400 transition-colors">Strategy Essays</h3>
-                  <p className="text-gray-500 text-sm">{errorStatus.strategy ? "Folder sync error" : "Live case studies."}</p>
+                  <p className="text-gray-500 text-sm">{errorStatus.strategy ? "Sync failed" : "Live case studies."}</p>
                 </div>
               </div>
               <div className="mr-4 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:translate-x-2 transition-transform">
