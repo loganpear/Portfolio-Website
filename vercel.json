@@ -1,0 +1,6 @@
+
+{
+  "rewrites": [
+    { "source": "/(swe|data-science|strategy)", "destination": "/" }
+  ]
+}
